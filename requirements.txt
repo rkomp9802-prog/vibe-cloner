@@ -1,6 +1,4 @@
 streamlit
-moviepy
-openai-whisper
 yt-dlp
-requests
-elevenlabs
+openai-whisper
+setuptools
