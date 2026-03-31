@@ -24,11 +24,22 @@ if st.button("🔥 ЗАПУСТИТЬ ПОЛНУЮ ПЕРЕДЕЛКУ"):
         progress_bar = st.progress(0)
 
         # ШАГ 1: Скачивание аудио
-        status_text.write("⏳ [1/4] Скачиваю аудио из видео...")
-        ydl_opts = {'format': 'bestaudio/best', 'outtmpl': 'temp_audio.mp3', 'quiet': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_url])
-        progress_bar.progress(25)
+        # ШАГ 1: Скачивание аудио (Исправленная версия)
+status_text.write("⏳ [1/4] Скачиваю аудио из видео...")
+try:
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': 'temp_audio.mp3',
+        'quiet': True,
+        'no_warnings': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([video_url])
+    progress_bar.progress(25)
+except Exception as e:
+    st.error(f"❌ Ошибка скачивания: Попробуй другую ссылку или проверь формат. Техническая инфо: {str(e)}")
+    st.stop()
 
         # ШАГ 2: Текст через Whisper
         status_text.write("🎙️ [2/4] Нейросеть слушает и записывает текст...")
