@@ -3,71 +3,83 @@ import yt_dlp
 import os
 import speech_recognition as sr
 import requests
+from pydub import AudioSegment
 
 st.set_page_config(page_title="AI Video Reborn", page_icon="🎬")
 st.title("🚀 AI Video Reborn: Полный Автомат")
 
-# Сайдбар для настроек
+# Боковая панель
 with st.sidebar:
-    st.header("⚙️ Настройки ИИ")
+    st.header("⚙️ Настройки")
     api_key = st.text_input("ElevenLabs API Key", type="password")
-    voice_id = st.text_input("Твой Voice ID")
-    st.info("Куки активны. YouTube должен работать!")
+    voice_id = st.text_input("Voice ID")
+    st.warning("Убедись, что файл cookies.txt загружен на GitHub!")
 
-video_url = st.text_input("🔗 Вставь ссылку на видео:")
+video_url = st.text_input("🔗 Ссылка на YouTube (Shorts или Видео):")
 
 if st.button("🔥 ЗАПУСТИТЬ ВСЁ САМО"):
     if not video_url or not api_key or not voice_id:
-        st.error("❌ Заполни ссылку, API ключ и Voice ID!")
+        st.error("❌ Заполни все поля в настройках!")
     else:
         status = st.empty()
         bar = st.progress(0)
         
         try:
-            # --- ШАГ 1: АВТО-СКАЧИВАНИЕ ---
-            status.write("⏳ Шаг 1: Скачиваю оригинал...")
-            audio_wav = "source.wav"
+            # --- ШАГ 1: СКАЧИВАНИЕ ---
+            status.write("⏳ Шаг 1: Скачиваю звук с YouTube...")
+            
             ydl_opts = {
                 'format': 'bestaudio/best',
-                'outtmpl': 'temp_audio',
-                'cookiefile': 'cookies.txt', # Твой паспорт для YouTube
-                'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'wav'}],
+                'outtmpl': 'audio_raw',
+                'cookiefile': 'cookies.txt', # Твой файл с куками
+                'noplaylist': True,
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'wav',
+                }],
             }
+            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([video_url])
-            os.rename("temp_audio.wav", audio_wav)
-            bar.progress(33)
+            
+            audio_file = "audio_raw.wav"
+            bar.progress(30)
 
-            # --- ШАГ 2: АВТО-ТЕКСТ ---
-            status.write("🎙️ Шаг 2: Слушаю и пишу текст...")
+            # --- ШАГ 2: РАСПОЗНАВАНИЕ (Легкий метод) ---
+            status.write("🎙️ Шаг 2: Распознаю текст...")
             r = sr.Recognizer()
-            with sr.AudioFile(audio_wav) as source:
+            with sr.AudioFile(audio_file) as source:
                 audio_data = r.record(source)
-                original_text = r.recognize_google(audio_data, language="ru-RU")
-            st.info(f"Распознано: {original_text[:100]}...")
-            bar.progress(66)
+                # Используем бесплатный движок Google для скорости
+                text = r.recognize_google(audio_data, language="ru-RU")
+            
+            st.info(f"Текст распознан: {text[:200]}...")
+            bar.progress(60)
 
-            # --- ШАГ 3: АВТО-ГОЛОС (ElevenLabs) ---
+            # --- ШАГ 3: ОЗВУЧКА ---
             status.write("🗣️ Шаг 3: Генерирую твой голос...")
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+            tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
             headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
             data = {
-                "text": original_text,
+                "text": text,
                 "model_id": "eleven_multilingual_v2",
-                "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}
+                "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}
             }
             
-            response = requests.post(url, json=data, headers=headers)
+            response = requests.post(tts_url, json=data, headers=headers)
             
             if response.status_code == 200:
-                with open("ai_voice.mp3", "wb") as f:
+                with open("result.mp3", "wb") as f:
                     f.write(response.content)
                 bar.progress(100)
-                st.success("✅ Готово! Твой клон заговорил.")
-                st.audio("ai_voice.mp3") # Можно сразу послушать результат
-                st.download_button("📥 Скачать готовую озвучку", open("ai_voice.mp3", "rb"), "result.mp3")
+                st.success("✅ Всё готово!")
+                st.audio("result.mp3")
             else:
                 st.error(f"Ошибка ElevenLabs: {response.text}")
 
         except Exception as e:
-            st.error(f"⚠️ Ошибка: {str(e)}")
+            st.error(f"⚠️ Произошла ошибка: {str(e)}")
+        
+        # Чистим временные файлы
+        if os.path.exists("audio_raw.wav"):
+            os.remove("audio_raw.wav")
