@@ -2,3 +2,4 @@ streamlit
 yt-dlp
 SpeechRecognition
 pydub
+requests
