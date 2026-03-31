@@ -3,10 +3,11 @@ import yt_dlp
 import whisper
 import os
 
+# Настройка страницы
 st.set_page_config(page_title="AI Video Reborn", page_icon="🎬")
 st.title("🚀 AI Video Reborn: Полный Клон")
 
-# Настройки в боковой панели
+# Боковая панель
 with st.sidebar:
     st.header("⚙️ Ключи API")
     leo_key = st.text_input("Ключ Leonardo", type="password")
@@ -19,47 +20,39 @@ if st.button("🔥 ЗАПУСТИТЬ ПОЛНУЮ ПЕРЕДЕЛКУ"):
     if not leo_key or not eleven_key or not video_url:
         st.error("❌ Сначала заполни ключи и ссылку!")
     else:
-        # Создаем элементы интерфейса
         status_text = st.empty()
         progress_bar = st.progress(0)
 
-        # ШАГ 1: Скачивание аудио
-        # ШАГ 1: Скачивание аудио (Исправленная версия)
-status_text.write("⏳ [1/4] Скачиваю аудио из видео...")
-try:
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': 'temp_audio.mp3',
-        'quiet': True,
-        'no_warnings': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([video_url])
-    progress_bar.progress(25)
-except Exception as e:
-    st.error(f"❌ Ошибка скачивания: Попробуй другую ссылку или проверь формат. Техническая инфо: {str(e)}")
-    st.stop()
+        try:
+            # ШАГ 1: Скачивание
+            status_text.write("⏳ [1/4] Скачиваю аудио...")
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': 'temp_audio.mp3',
+                'quiet': True,
+                'no_warnings': True,
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([video_url])
+            progress_bar.progress(25)
 
-        # ШАГ 2: Текст через Whisper
-        status_text.write("🎙️ [2/4] Нейросеть слушает и записывает текст...")
-        model = whisper.load_model("base")
-        result = model.transcribe("temp_audio.mp3")
-        final_text = result['text']
-        st.write("**Распознанный текст:**", final_text[:200] + "...") # Показываем кусочек
-        progress_bar.progress(50)
+            # ШАГ 2: Whisper
+            status_text.write("🎙️ [2/4] Нейросеть слушает текст...")
+            model = whisper.load_model("base")
+            result = model.transcribe("temp_audio.mp3")
+            st.write("**Текст из видео:**", result['text'][:300] + "...")
+            progress_bar.progress(50)
 
-        # ШАГ 3: Озвучка (Здесь будет запрос к ElevenLabs)
-        status_text.write("🗣️ [3/4] Генерирую твой голос через ElevenLabs...")
-        # (Временно имитируем, пока не пропишем твой Voice ID)
-        progress_bar.progress(75)
+            # ШАГ 3 и 4 (заглушки)
+            status_text.write("🗣️ [3/4] Работа с голосом...")
+            progress_bar.progress(75)
+            status_text.write("🎨 [4/4] Генерация кадров...")
+            progress_bar.progress(100)
 
-        # ШАГ 4: Генерация видео (Здесь будет Leonardo)
-        status_text.write("🎨 [4/4] Рисую уникальные кадры...")
-        progress_bar.progress(100)
+            st.success("✅ Готово!")
+            with open("temp_audio.mp3", "rb") as f:
+                st.download_button("📥 Скачать результат", f, "result.mp3")
 
-        st.success("✅ Клон готов! (Версия 1.0)")
-        
-        # Кнопка скачивания (пока для примера скачиваем аудио)
-        with open("temp_audio.mp3", "rb") as file:
-            st.download_button(label="📥 СКАЧАТЬ РЕЗУЛЬТАТ", data=file, file_name="ai_video_reborn.mp3")
+        except Exception as e:
+            st.error(f"⚠️ Ошибка: {str(e)}")
