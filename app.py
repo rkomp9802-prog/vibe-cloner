@@ -1,19 +1,19 @@
 import streamlit as st
 import yt_dlp
 import os
-from speech_recognition import Recognizer, AudioFile
+import speech_recognition as sr
 
 # Настройка страницы
 st.set_page_config(page_title="AI Video Reborn", page_icon="🎬")
 st.title("🚀 AI Video Reborn: Полный Клон")
 
 with st.sidebar:
-    st.header("⚙️ Ключи API")
-    st.info("Ключи ElevenLabs понадобятся на следующем этапе")
+    st.header("⚙️ Настройки API")
+    st.info("Убедитесь, что файлы requirements.txt и packages.txt настроены верно.")
 
 st.markdown("### Источник контента")
 video_url = st.text_input("🔗 Ссылка на YouTube:")
-uploaded_file = st.file_uploader("📥 Или загрузи аудиофайл (WAV работает лучше всего):", type=['wav', 'mp3'])
+uploaded_file = st.file_uploader("📥 Загрузи аудио (WAV или MP3):", type=['wav', 'mp3'])
 
 if st.button("🔥 НАЧАТЬ ТРАНСФОРМАЦИЮ"):
     if not video_url and not uploaded_file:
@@ -28,16 +28,15 @@ if st.button("🔥 НАЧАТЬ ТРАНСФОРМАЦИЮ"):
             audio_path = "temp_audio.wav"
             
             if uploaded_file:
-                # Если загружен файл, сохраняем его
                 with open("temp_input", "wb") as f:
                     f.write(uploaded_file.getbuffer())
-                # Конвертируем в нужный формат через системную команду
+                # Используем ffmpeg (из packages.txt) для конвертации
                 os.system(f"ffmpeg -i temp_input -ar 16000 -ac 1 -y {audio_path}")
             else:
-                # Скачиваем с YouTube сразу в WAV
+                status.write("⏳ Скачиваю с YouTube...")
                 ydl_opts = {
                     'format': 'bestaudio/best',
-                    'outtmpl': 'temp_input',
+                    'outtmpl': 'temp_download',
                     'postprocessors': [{
                         'key': 'FFmpegExtractAudio',
                         'preferredcodec': 'wav',
@@ -46,26 +45,27 @@ if st.button("🔥 НАЧАТЬ ТРАНСФОРМАЦИЮ"):
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([video_url])
-                os.rename("temp_input.wav", audio_path)
+                if os.path.exists("temp_download.wav"):
+                    os.rename("temp_download.wav", audio_path)
             
             bar.progress(40)
 
             # ШАГ 2: Распознавание текста
-            status.write("🎙️ ИИ расшифровывает текст...")
-            r = Recognizer()
-            with AudioFile(audio_path) as source:
-                audio_data = r.record(source)
-                text = r.recognize_google(audio_data, language="ru-RU")
-            
-            bar.progress(80)
-            st.success("✅ Текст получен!")
-            st.markdown("---")
-            st.write("**Текст вашего видео:**")
-            st.info(text)
-            
-            bar.progress(100)
-            st.balloons()
+            if os.path.exists(audio_path):
+                status.write("🎙️ ИИ расшифровывает текст...")
+                r = sr.Recognizer()
+                with sr.AudioFile(audio_path) as source:
+                    audio_data = r.record(source)
+                    # Используем Google Speech Recognition (бесплатно)
+                    text = r.recognize_google(audio_data, language="ru-RU")
+                
+                bar.progress(80)
+                st.success("✅ Текст получен!")
+                st.info(text)
+                bar.progress(100)
+                st.balloons()
+            else:
+                st.error("❌ Файл аудио не был создан. Проверьте packages.txt")
             
         except Exception as e:
             st.error(f"⚠️ Ошибка: {str(e)}")
-            st.info("Убедитесь, что вы создали файл packages.txt с текстом 'ffmpeg'.")
