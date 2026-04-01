@@ -1,5 +1,8 @@
 streamlit
+
 SpeechRecognition
+
 pydub
+
 google-generativeai
 requests
