@@ -5,43 +5,45 @@ import requests
 from pydub import AudioSegment
 from openai import OpenAI
 
-# --- ТВОИ ОБНОВЛЕННЫЕ КЛЮЧИ ---
-DEFAULT_ELEVEN_KEY = "375561f84c040d79f3d7ccf5442529bcc35f88cc54e964da2f32a0fb3de493d3"
-DEFAULT_VOICE_ID = "M1CSR3PJBsfWU6ZquG3C"
-DEFAULT_GROK_KEY = "xai-TY5RCmyFtjPwTSk61SWGHXK0V4InmGRxmr8KCpDb1cDQCoFJL6kKScZlR83L9lXoiy1sVYXhlXhYGzFW"
-
-st.set_page_config(page_title="Video AI Reborn v4.4", page_icon="🚀")
+# Настройка страницы
+st.set_page_config(page_title="Hype-Machine v4.5", page_icon="🚀")
 st.title("🎬 Конвейер Хайпа: Полный Автомат")
 
-# Подтягиваем ключи
-eleven_key = st.secrets.get("ELEVEN_KEY", DEFAULT_ELEVEN_KEY)
-voice_id = st.secrets.get("VOICE_ID", DEFAULT_VOICE_ID)
-grok_key = st.secrets.get("GROK_KEY", DEFAULT_GROK_KEY)
+# --- БЕЗОПАСНОЕ ПОДКЛЮЧЕНИЕ КЛЮЧЕЙ ---
+# Теперь программа берет ключи из Settings -> Secrets в Streamlit
+try:
+    eleven_key = st.secrets["ELEVEN_KEY"]
+    voice_id = st.secrets["VOICE_ID"]
+    grok_key = st.secrets["GROK_KEY"]
+except Exception:
+    st.error("⚠️ Ключи не найдены в Secrets! Настрой их в панели управления Streamlit.")
+    st.stop()
 
 with st.sidebar:
-    st.header("🔑 Доступ")
-    st.success("✅ Все ключи настроены")
-    st.info("Просто закинь видео и жди результат.")
+    st.header("🔑 Статус доступа")
+    st.success("✅ Ключи загружены из системы")
+    st.info("Это самый безопасный способ работы.")
 
+# --- ОСНОВНАЯ ЛОГИКА ---
 uploaded_video = st.file_uploader("📥 Загрузи видео (MP4/MOV):", type=['mp4', 'mov', 'avi'])
 
 if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
     if not uploaded_video:
-        st.error("❌ Загрузи файл!")
+        st.error("❌ Сначала выбери файл!")
     else:
         status = st.empty()
         bar = st.progress(0)
         
         try:
-            # 1. Звук
+            # 1. Извлечение звука (нужен ffmpeg в packages.txt)
             status.write("⏳ Шаг 1: Извлекаю аудио...")
             with open("temp_video.mp4", "wb") as f:
                 f.write(uploaded_video.getbuffer())
             os.system("ffmpeg -i temp_video.mp4 -ab 160k -ac 2 -ar 44100 -vn temp_audio.wav -y")
             bar.progress(25)
 
-            # 2. Текст
-            status.write("🎙️ Шаг 2: Распознаю речь...")
+            # 2. Распознавание речи
+            status.write("🎙️ Шаг 2: Распознаю текст...")
             r = sr.Recognizer()
             with sr.AudioFile("temp_audio.wav") as source:
                 audio_data = r.record(source)
@@ -49,14 +51,14 @@ if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
             st.write("**Оригинал:**", raw_text)
             bar.progress(50)
 
-            # 3. Grok (Умный выбор модели)
+            # 3. Работа с Grok (Авто-выбор модели)
             status.write("🤖 Шаг 3: Grok пишет сценарий...")
             client = OpenAI(api_key=grok_key, base_url="https://api.x.ai/v1")
             
             prompt = f"Перепиши этот текст для YouTube Shorts. Сделай его максимально захватывающим и виральным. Текст: {raw_text}"
             
-            # Пробуем по очереди разные названия моделей, чтобы избежать ошибки 400
-            success = False
+            # Пробуем доступные модели по очереди
+            success_grok = False
             for model_name in ["grok-2-1212", "grok-2", "grok-beta"]:
                 try:
                     completion = client.chat.completions.create(
@@ -64,20 +66,21 @@ if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
                         messages=[{"role": "user", "content": prompt}]
                     )
                     final_text = completion.choices[0].message.content
-                    st.success(f"✨ Сценарий готов (использована модель {model_name})")
-                    success = True
+                    st.success(f"✨ Сценарий готов (модель {model_name})")
+                    success_grok = True
                     break
-                except Exception:
+                except:
                     continue
             
-            if not success:
-                raise Exception("Ни одна модель Grok не ответила. Проверь баланс в xAI консоли.")
+            if not success_grok:
+                st.error("❌ Ошибка: Grok не смог подобрать модель. Проверь баланс xAI.")
+                st.stop()
             
             st.write(final_text)
             bar.progress(75)
 
             # 4. Озвучка ElevenLabs
-            status.write("🗣️ Шаг 4: Генерирую ИИ-голос...")
+            status.write("🗣️ Шаг 4: Генерирую финальный голос...")
             tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
             headers = {"xi-api-key": eleven_key, "Content-Type": "application/json"}
             data = {
@@ -92,13 +95,13 @@ if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
                     f.write(res.content)
                 bar.progress(100)
                 st.audio("result.mp3")
-                st.download_button("📥 Скачать озвучку", open("result.mp3", "rb"), "result.mp3")
+                st.download_button("📥 Скачать результат", open("result.mp3", "rb"), "final_voice.mp3")
             else:
                 st.error(f"Ошибка ElevenLabs: {res.text}")
 
         except Exception as e:
-            st.error(f"⚠️ Ошибка: {str(e)}")
+            st.error(f"⚠️ Произошла ошибка: {str(e)}")
         
-        # Чистим файлы
+        # Уборка
         for f in ["temp_video.mp4", "temp_audio.wav"]:
             if os.path.exists(f): os.remove(f)
