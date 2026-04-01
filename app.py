@@ -4,13 +4,13 @@ import speech_recognition as sr
 import requests
 import google.generativeai as genai
 
-# --- БЕЗОПАСНЫЙ ДОСТУП ---
+# Подключение ключей из системы Secrets
 try:
     eleven_key = st.secrets["ELEVEN_KEY"]
     voice_id = st.secrets["VOICE_ID"]
     gemini_key = st.secrets["GEMINI_KEY"]
 except Exception:
-    st.error("❌ Ошибка: Ключи не найдены в Secrets!")
+    st.error("❌ Ключи не найдены в Secrets! Настрой их в панели управления Streamlit.")
     st.stop()
 
 st.set_page_config(page_title="Hype-Machine v5.2", page_icon="♊")
@@ -24,34 +24,34 @@ uploaded_video = st.file_uploader("📥 Загрузи видео:", type=['mp4'
 
 if st.button("🚀 ЗАПУСТИТЬ"):
     if not uploaded_video:
-        st.error("❌ Выбери файл!")
+        st.error("❌ Сначала выбери файл!")
     else:
         status = st.empty()
         try:
-            # 1. Извлекаем звук
+            # 1. Извлечение аудио
             status.write("⏳ Шаг 1: Работа с аудио...")
             with open("temp_video.mp4", "wb") as f:
                 f.write(uploaded_video.getbuffer())
             os.system("ffmpeg -i temp_video.mp4 -ab 160k -ac 2 -ar 44100 -vn temp_audio.wav -y")
 
-            # 2. Распознаем текст
-            status.write("🎙️ Шаг 2: Слушаю оригинал...")
+            # 2. Распознавание речи
+            status.write("🎙️ Шаг 2: Распознаю текст оригинала...")
             r = sr.Recognizer()
             with sr.AudioFile("temp_audio.wav") as source:
                 audio_data = r.record(source)
                 raw_text = r.recognize_google(audio_data, language="ru-RU")
             st.write("**Оригинал:**", raw_text)
 
-            # 3. Gemini пишет сценарий
-            status.write("♊ Шаг 3: Gemini переписывает...")
-            prompt = f"Перепиши этот текст для YouTube Shorts. Сделай его захватывающим и коротким. Текст: {raw_text}"
+            # 3. Gemini переписывает сценарий
+            status.write("♊ Шаг 3: Gemini делает текст хайповым...")
+            prompt = f"Перепиши этот текст для YouTube Shorts. Сделай его коротким и захватывающим. Текст: {raw_text}"
             response = model.generate_content(prompt)
             final_text = response.text
             st.success("✨ Сценарий готов!")
             st.write(final_text)
 
-            # 4. ElevenLabs озвучивает
-            status.write("🗣️ Шаг 4: Озвучка...")
+            # 4. Озвучка в ElevenLabs
+            status.write("🗣️ Шаг 4: Генерирую ИИ-голос...")
             tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
             headers = {"xi-api-key": eleven_key, "Content-Type": "application/json"}
             data = {
