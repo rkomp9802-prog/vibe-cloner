@@ -5,7 +5,7 @@ import requests
 from pydub import AudioSegment
 from openai import OpenAI
 
-st.set_page_config(page_title="AI Video Reborn v3.0", page_icon="🚀")
+st.set_page_config(page_title="AI Video Reborn v3.1", page_icon="🚀")
 st.title("🎬 Конвейер Хайпа: Video + Grok + ElevenLabs")
 
 # --- БОКОВАЯ ПАНЕЛЬ ---
@@ -34,6 +34,7 @@ if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
             status.write("⏳ Шаг 1: Достаю звук из видео...")
             with open("temp_video.mp4", "wb") as f:
                 f.write(uploaded_video.getbuffer())
+            # Используем ffmpeg для конвертации в wav
             os.system("ffmpeg -i temp_video.mp4 -ab 160k -ac 2 -ar 44100 -vn temp_audio.wav -y")
             bar.progress(25)
 
@@ -46,15 +47,15 @@ if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
             st.write("**Оригинальный текст:**", raw_text)
             bar.progress(50)
 
-            # 3. Улучшение через Grok
+            # 3. Улучшение через Grok (Исправленная модель)
             status.write("🤖 Шаг 3: Grok делает текст хайповым...")
             client = OpenAI(api_key=grok_key, base_url="https://api.x.ai/v1")
             
-            # Промпт под твой стиль (история/выживание)
             prompt = f"Перепиши этот текст для YouTube Shorts. Сделай его максимально захватывающим, в стиле исторического триллера или survival-хоррора. Используй сильные глаголы и короткие фразы. Текст: {raw_text}"
             
+            # Пробуем модель grok-2 (она самая актуальная)
             completion = client.chat.completions.create(
-                model="grok-beta", 
+                model="grok-2", 
                 messages=[{"role": "user", "content": prompt}]
             )
             final_text = completion.choices[0].message.content
@@ -86,6 +87,6 @@ if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
         except Exception as e:
             st.error(f"⚠️ Ошибка: {str(e)}")
         
-        # Удаляем мусор
+        # Удаляем временные файлы
         for f in ["temp_video.mp4", "temp_audio.wav"]:
             if os.path.exists(f): os.remove(f)
