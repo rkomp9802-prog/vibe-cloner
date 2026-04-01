@@ -3,75 +3,89 @@ import os
 import speech_recognition as sr
 import requests
 from pydub import AudioSegment
+from openai import OpenAI
 
-st.set_page_config(page_title="AI Video Reborn", page_icon="🎬")
-st.title("🎬 Video-to-Voice: Полный Автомат")
+st.set_page_config(page_title="AI Video Reborn v3.0", page_icon="🚀")
+st.title("🎬 Конвейер Хайпа: Video + Grok + ElevenLabs")
 
-# Настройки в боковой панели
+# --- БОКОВАЯ ПАНЕЛЬ ---
 with st.sidebar:
-    st.header("⚙️ Настройки ИИ")
-    api_key = st.text_input("ElevenLabs API Key", type="password")
-    voice_id = st.text_input("Voice ID")
-    st.info("Просто загрузи видео, и я сделаю всё остальное.")
+    st.header("🔑 Ключи доступа")
+    eleven_key = st.text_input("ElevenLabs API Key", type="password")
+    voice_id = st.text_input("ElevenLabs Voice ID")
+    grok_key = st.text_input("xAI (Grok) API Key", type="password")
+    st.markdown("---")
+    st.info("Загрузи видео -> Grok сделает текст мощнее -> ElevenLabs озвучит.")
 
-# Основной интерфейс
-uploaded_video = st.file_uploader("📥 Загрузи свое видео (MP4, MOV, AVI):", type=['mp4', 'mov', 'avi'])
+# --- ИНТЕРФЕЙС ---
+uploaded_video = st.file_uploader("📥 Загрузи видео (MP4/MOV):", type=['mp4', 'mov', 'avi'])
 
-if st.button("🔥 ПЕРЕОЗВУЧИТЬ"):
-    if not api_key or not voice_id:
-        st.error("❌ Сначала введи API Key и Voice ID в боковом меню!")
+if st.button("🔥 ПЕРЕРОДИТЬ КОНТЕНТ"):
+    if not all([eleven_key, voice_id, grok_key]):
+        st.error("❌ Заполни все ключи в меню слева!")
     elif not uploaded_video:
-        st.error("❌ Загрузи видеофайл!")
+        st.error("❌ Загрузи файл видео!")
     else:
         status = st.empty()
         bar = st.progress(0)
         
         try:
-            # Шаг 1: Сохранение видео и извлечение звука
-            status.write("⏳ Извлекаю звук из видео...")
+            # 1. Извлечение звука
+            status.write("⏳ Шаг 1: Достаю звук из видео...")
             with open("temp_video.mp4", "wb") as f:
                 f.write(uploaded_video.getbuffer())
-            
-            # Используем ffmpeg для вытягивания чистого звука
             os.system("ffmpeg -i temp_video.mp4 -ab 160k -ac 2 -ar 44100 -vn temp_audio.wav -y")
-            bar.progress(30)
+            bar.progress(25)
 
-            # Шаг 2: Распознавание текста
-            status.write("🎙️ Распознаю текст...")
+            # 2. Распознавание текста
+            status.write("🎙️ Шаг 2: Слушаю оригинал...")
             r = sr.Recognizer()
             with sr.AudioFile("temp_audio.wav") as source:
                 audio_data = r.record(source)
-                text = r.recognize_google(audio_data, language="ru-RU")
-            
-            st.success("✅ Текст распознан!")
-            st.text_area("Распознанный текст:", text, height=150)
-            bar.progress(60)
+                raw_text = r.recognize_google(audio_data, language="ru-RU")
+            st.write("**Оригинальный текст:**", raw_text)
+            bar.progress(50)
 
-            # Шаг 3: Генерация новой озвучки
-            status.write("🗣️ Генерирую твой голос в ElevenLabs...")
+            # 3. Улучшение через Grok
+            status.write("🤖 Шаг 3: Grok делает текст хайповым...")
+            client = OpenAI(api_key=grok_key, base_url="https://api.x.ai/v1")
+            
+            # Промпт под твой стиль (история/выживание)
+            prompt = f"Перепиши этот текст для YouTube Shorts. Сделай его максимально захватывающим, в стиле исторического триллера или survival-хоррора. Используй сильные глаголы и короткие фразы. Текст: {raw_text}"
+            
+            completion = client.chat.completions.create(
+                model="grok-beta", 
+                messages=[{"role": "user", "content": prompt}]
+            )
+            final_text = completion.choices[0].message.content
+            st.success("✨ Grok переписал сценарий:")
+            st.write(final_text)
+            bar.progress(75)
+
+            # 4. Озвучка в ElevenLabs
+            status.write("🗣️ Шаг 4: Твой клон читает новый текст...")
             tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-            headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
+            headers = {"xi-api-key": eleven_key, "Content-Type": "application/json"}
             data = {
-                "text": text,
+                "text": final_text,
                 "model_id": "eleven_multilingual_v2",
-                "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}
+                "voice_settings": {"stability": 0.45, "similarity_boost": 0.8}
             }
             
-            response = requests.post(tts_url, json=data, headers=headers)
-            
-            if response.status_code == 200:
-                with open("final_voice.mp3", "wb") as f:
-                    f.write(response.content)
+            res = requests.post(tts_url, json=data, headers=headers)
+            if res.status_code == 200:
+                with open("result.mp3", "wb") as f:
+                    f.write(res.content)
                 bar.progress(100)
-                st.success("🎉 Готово! Твой новый голос:")
-                st.audio("final_voice.mp3")
-                st.download_button("📥 Скачать озвучку", open("final_voice.mp3", "rb"), "result.mp3")
+                st.balloons()
+                st.audio("result.mp3")
+                st.download_button("📥 Скачать готовую озвучку", open("result.mp3", "rb"), "final.mp3")
             else:
-                st.error(f"Ошибка ElevenLabs: {response.text}")
+                st.error(f"Ошибка ElevenLabs: {res.text}")
 
         except Exception as e:
             st.error(f"⚠️ Ошибка: {str(e)}")
         
-        # Уборка мусора
+        # Удаляем мусор
         for f in ["temp_video.mp4", "temp_audio.wav"]:
             if os.path.exists(f): os.remove(f)
