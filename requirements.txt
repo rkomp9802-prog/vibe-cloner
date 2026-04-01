@@ -1,6 +1,5 @@
 streamlit
 SpeechRecognition
 pydub
-requests
-openai
 google-generativeai
+requests
