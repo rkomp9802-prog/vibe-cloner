@@ -1,64 +1,71 @@
 import streamlit as st
 import google.generativeai as genai
 import requests
-import os
 
-# Настройка страницы
-st.set_page_config(page_title="Конвейер v6.0", layout="wide")
+# 1. Настройка страницы
+st.set_page_config(page_title="Конвейер v7.0", layout="centered")
+st.title("🎬 Конвейер: Gemini + ElevenLabs")
 
-# Пробуем загрузить ключи
+# 2. Безопасное получение ключей (с очисткой от пробелов)
 try:
     GEMINI_KEY = st.secrets["GEMINI_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVEN_KEY"].strip()
     VOICE_ID = st.secrets["VOICE_ID"].strip()
 except Exception as e:
-    st.error("Ошибка: Ключи не найдены в Secrets!")
+    st.error("Критическая ошибка: Ключи не найдены в Secrets!")
     st.stop()
 
-# Инициализация Gemini
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# 3. Настройка Gemini (используем стабильный метод конфигурации)
+try:
+    genai.configure(api_key=GEMINI_KEY)
+    # Используем модель flash, она самая быстрая и стабильная
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except Exception as e:
+    st.error(f"Ошибка настройки Gemini: {e}")
 
-st.title("🎬 Конвейер: Gemini + ElevenLabs")
+# Поле для ввода исходного текста (пока без STT, чтобы не падал интерфейс)
+text_input = st.text_area("Введите идею для видео:", "Что было бы, если бы ты провел неделю в СССР в 1982 году?")
 
-uploaded_file = st.file_uploader("Загрузи видео", type=['mp4', 'mov'])
-
-if st.button("🚀 ЗАПУСТИТЬ"):
-    if uploaded_file:
-        with st.status("Обработка...") as status:
-            # 1. Заглушка для текста (так как STT требует ffmpeg в системе)
-            # Если ты используешь готовый текст, вставь его сюда
-            text_orig = "Что было бы если бы ты провел неделю в СССР..." 
-            
-            st.write(" Gemini пишет сценарий...")
-            prompt = f"Сделай короткий виральный сценарий для Shorts из этого текста: {text_orig}"
+if st.button("🚀 ЗАПУСТИТЬ ГЕНЕРАЦИЮ"):
+    with st.status("В процессе...") as status:
+        
+        # ШАГ 1: Gemini делает сценарий
+        st.write("🤖 Gemini пишет виральный сценарий...")
+        try:
+            prompt = f"Напиши короткий динамичный сценарий для Shorts на основе этого текста: {text_input}. Используй эмодзи и короткие фразы."
             response = model.generate_content(prompt)
             final_text = response.text
-            
-            st.subheader("📝 Готовый сценарий:")
-            st.write(final_text)
-            
-            st.write("🗣️ Озвучка ElevenLabs...")
-            # Чистим текст от звездочек и лишних символов перед озвучкой
-            clean_text = final_text.replace("*", "").replace("#", "")
-            
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-            headers = {
-                "xi-api-key": ELEVEN_KEY,
-                "Content-Type": "application/json"
-            }
-            data = {
-                "text": clean_text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}
-            }
-            
-            res = requests.post(url, json=data, headers=headers)
-            
-            if res.status_code == 200:
-                st.audio(res.content, format='audio/mp3')
-                st.success("Готово!")
-            else:
-                st.error(f"Ошибка ElevenLabs {res.status_code}: {res.text}")
-    else:
-        st.warning("Сначала загрузи файл!")
+            st.success("Сценарий готов!")
+            st.markdown(f"**Текст сценария:**\n\n{final_text}")
+        except Exception as e:
+            st.error(f"Ошибка Gemini: {e}")
+            st.stop()
+
+        # ШАГ 2: ElevenLabs делает озвучку
+        st.write("🗣️ ElevenLabs озвучивает...")
+        
+        # Показываем диагностику для контроля
+        st.info(f"Диагностика ElevenLabs: отправляю ключ длиной {len(ELEVEN_KEY)} симв.")
+        
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
+        headers = {
+            "xi-api-key": ELEVEN_KEY,
+            "Content-Type": "application/json"
+        }
+        # Убираем спецсимволы перед озвучкой
+        clean_text = final_text.replace("*", "").replace("#", "")
+        
+        data = {
+            "text": clean_text,
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}
+        }
+        
+        res = requests.post(url, json=data, headers=headers)
+        
+        if res.status_code == 200:
+            st.audio(res.content, format='audio/mp3')
+            st.success("Аудио успешно сгенерировано!")
+        else:
+            # Если опять 401 или другая ошибка — выводим детали
+            st.error(f"Ошибка ElevenLabs ({res.status_code}): {res.text}")
